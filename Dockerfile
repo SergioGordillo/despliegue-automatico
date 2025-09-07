@@ -1,33 +1,48 @@
-# Usa Node 22 Alpine
-FROM node:22-alpine
+# ---- Stage 1: Build ----
+FROM node:22-alpine AS builder
 
-# Carpeta de la app
+# Carpeta de trabajo
 WORKDIR /usr/app
 
-# Copia package.json y package-lock.json para aprovechar cache
-COPY package*.json ./
+# Copiamos package.json (sin exigir package-lock.json)
+COPY package.json ./
 
-# Instala solo dependencias de producción
-RUN npm ci --omit=dev
+# Instalamos todas las dependencias (dev incluidas para compilar TS)
+RUN npm install
 
-# Copia el resto del proyecto
+# Copiamos el resto del proyecto
 COPY . .
 
-# Compila TypeScript
+# Compilamos TypeScript
 RUN npm run build
 
-# Expone el puerto (usando la variable de entorno)
-ENV PORT=3000
-EXPOSE ${PORT}
 
-# Variables de entorno necesarias
+# ---- Stage 2: Release ----
+FROM node:22-alpine AS release
+
+WORKDIR /usr/app
+
+# Copiamos solo package.json
+COPY package.json ./
+
+# Instalamos solo dependencias de producción
+RUN npm install --omit=dev
+
+# Copiamos la carpeta compilada desde el builder
+COPY --from=builder /usr/app/dist ./dist
+
+# Variables de entorno por defecto
 ENV NODE_ENV=production
+ENV PORT=3000
 ENV STATIC_FILES_PATH=../public
 ENV CORS_ORIGIN=*
 ENV CORS_METHOD=GET,POST,PUT,DELETE
 ENV MONGODB_URI=mongodb://localhost:27017/airbnb
 ENV MONGODB_URI_ATLAS=mongodb+srv://mern_user:mern_user@cluster0.irekbbg.mongodb.net/airbnb?retryWrites=true&w=majority&appName=Cluster0
 
-# Comando por defecto para iniciar la app
+# Exponemos el puerto
+EXPOSE ${PORT}
+
+# Comando de arranque
 CMD ["node", "dist/index.js"]
 
