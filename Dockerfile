@@ -30,6 +30,7 @@ RUN npm install --omit=dev
 
 # Copiamos la carpeta compilada desde el builder
 COPY --from=builder /usr/app/dist ./dist
+COPY --from=builder /usr/app/src ./src
 
 # Variables de entorno por defecto
 ENV NODE_ENV=production
