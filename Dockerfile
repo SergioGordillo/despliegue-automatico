@@ -1,33 +1,33 @@
-FROM node:22-alpine AS base
-RUN mkdir -p /usr/app
+# Usa Node 22 Alpine
+FROM node:22-alpine
+
+# Carpeta de la app
 WORKDIR /usr/app
 
-# Build front app
-FROM base AS front-build
-COPY ./front ./
-RUN npm ci
-RUN npm run build
+# Copia package.json y package-lock.json para aprovechar cache
+COPY package*.json ./
 
-# Build back app
-FROM base AS back-build
-COPY ./back ./
-RUN npm ci
-RUN npm run build
-
-# Release
-FROM base AS release
-COPY --from=front-build /usr/app/dist ./public
-COPY --from=back-build /usr/app/dist ./
-COPY ./back/package.json ./
-RUN apk update && apk add jq
-RUN updatedImports="$(jq '.imports[]|=sub("./src"; ".")' ./package.json)" && echo "${updatedImports}" > ./package.json
-COPY ./back/package-lock.json ./
+# Instala solo dependencias de producción
 RUN npm ci --omit=dev
 
-EXPOSE 3001
-ENV PORT=3001
-ENV STATIC_FILES_PATH=./public
-ENV IS_API_MOCK=true
-ENV AUTH_SECRET=MY_AUTH_SECRET
+# Copia el resto del proyecto
+COPY . .
 
-CMD ["node", "index"]
+# Compila TypeScript
+RUN npm run build
+
+# Expone el puerto (usando la variable de entorno)
+ENV PORT=3000
+EXPOSE ${PORT}
+
+# Variables de entorno necesarias
+ENV NODE_ENV=production
+ENV STATIC_FILES_PATH=../public
+ENV CORS_ORIGIN=*
+ENV CORS_METHOD=GET,POST,PUT,DELETE
+ENV MONGODB_URI=mongodb://localhost:27017/airbnb
+ENV MONGODB_URI_ATLAS=mongodb+srv://mern_user:mern_user@cluster0.irekbbg.mongodb.net/airbnb?retryWrites=true&w=majority&appName=Cluster0
+
+# Comando por defecto para iniciar la app
+CMD ["node", "dist/index.js"]
+
